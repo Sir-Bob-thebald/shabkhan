@@ -10,6 +10,7 @@ import '../sources/notion_atlas.dart';
 import '../sources/source.dart';
 import '../sources/substack.dart';
 import 'catalog_screen.dart';
+import 'notion_login_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'substack_login_screen.dart';
@@ -427,15 +428,26 @@ class _SubstackSectionState extends State<_SubstackSection> with _Busy {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
           child: Text(
-            '@${lib.substackHandle} follows ${lib.substackPubs.length}; $on in use. Together they count as one source, '
-            'so following many doesn\'t crowd out the others.',
+            '@${lib.substackHandle} follows ${lib.substackPubs.length} publications that post; $on in use. '
+            'Together they count as one source, so following many doesn\'t crowd out the others. '
+            'Tap one to open it on Substack.',
             style: hint,
           ),
         ),
         for (final pub in lib.substackPubs)
           ListTile(
             title: Text(pub.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text('${pub.host}${pub.paid ? ' · paid' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text(
+              [
+                if (pub.lastPost != null) 'last post ${_ago(pub.lastPost!)}',
+                if (pub.paid) 'paid',
+                pub.host,
+              ].join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            // Opens the publication on Substack (its app if installed, or the browser).
+            onTap: () => launchUrl(pub.page, mode: LaunchMode.externalApplication),
             contentPadding: const EdgeInsets.only(left: 16, right: 8),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -557,14 +569,23 @@ class _NotionSectionState extends State<_NotionSection> with _Busy {
             Wrap(
               spacing: 8,
               children: [
-                if (NotionAccount.oauthAvailable && Theme.of(context).platform == TargetPlatform.android)
+                if (NotionAccount.oauthAvailable && NotionLoginScreen.supported) ...[
+                  // In the app: Android would hand Notion's pages to the Notion app.
                   FilledButton.icon(
-                    // Signs in in the phone's browser (Google sign-in works there);
-                    // Notion sends the browser back to the app, see HomeShell._onLink.
-                    onPressed: busy ? null : () => run(_signInWithNotion),
+                    onPressed: busy
+                        ? null
+                        : () async => _connected(await Navigator.push<int>(
+                            context, MaterialPageRoute(builder: (_) => NotionLoginScreen(library: lib)))),
                     icon: const Icon(Icons.login),
                     label: const Text('Connect with Notion'),
                   ),
+                  // In the phone's browser, for Google sign-in; Notion sends the
+                  // browser back to the app, see HomeShell._onLink.
+                  TextButton(
+                    onPressed: busy ? null : () => run(_signInWithNotion),
+                    child: const Text('Sign in in the browser instead'),
+                  ),
+                ],
                 if (!NotionAccount.oauthAvailable)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4),
@@ -829,4 +850,14 @@ class LanguagePicker extends StatelessWidget {
       onChanged: onChanged,
     );
   }
+}
+
+/// "today", "3 days ago", "5 weeks ago", "2 years ago".
+String _ago(DateTime when, [DateTime? now]) {
+  final days = (now ?? DateTime.now()).difference(when).inDays;
+  if (days < 1) return 'today';
+  if (days < 14) return '$days day${days == 1 ? '' : 's'} ago';
+  if (days < 60) return '${days ~/ 7} weeks ago';
+  if (days < 730) return '${days ~/ 30} months ago';
+  return '${days ~/ 365} years ago';
 }

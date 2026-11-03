@@ -21,6 +21,9 @@ class SubstackPub {
   /// Whether its posts are offered at all.
   final bool on;
 
+  /// When it last published a post, found when the follow list was read.
+  final DateTime? lastPost;
+
   const SubstackPub({
     required this.id,
     required this.name,
@@ -28,6 +31,7 @@ class SubstackPub {
     required this.paid,
     this.type,
     this.on = true,
+    this.lastPost,
   });
 
   SubstackPub copyWith({ReadingType? Function()? type, bool? on, bool? paid}) => SubstackPub(
@@ -37,10 +41,25 @@ class SubstackPub {
         paid: paid ?? this.paid,
         type: type == null ? this.type : type(),
         on: on ?? this.on,
+        lastPost: lastPost,
       );
 
   Map<String, dynamic> toJson() =>
-      {'id': id, 'name': name, 'host': host, 'paid': paid, 'type': type?.name ?? 'auto', 'on': on};
+      {
+        'id': id,
+        'name': name,
+        'host': host,
+        'paid': paid,
+        'type': type?.name ?? 'auto',
+        'on': on,
+        if (lastPost != null) 'lastPost': lastPost!.toIso8601String(),
+      };
+
+  SubstackPub withLastPost(DateTime? d) =>
+      SubstackPub(id: id, name: name, host: host, paid: paid, type: type, on: on, lastPost: d);
+
+  /// The publication's home page on Substack.
+  Uri get page => Uri.https(host);
 
   factory SubstackPub.fromJson(Map<String, dynamic> j) => SubstackPub(
         id: j['id'] as int,
@@ -49,6 +68,7 @@ class SubstackPub {
         paid: j['paid'] as bool? ?? false,
         type: switch (j['type'] as String?) { null || 'auto' => null, final t => ReadingType.values.byName(t) },
         on: j['on'] as bool? ?? true,
+        lastPost: DateTime.tryParse(j['lastPost'] as String? ?? ''),
       );
 }
 
@@ -146,8 +166,32 @@ class SubstackAccount {
       throw SourceException('$handle\'s profile shows no subscriptions. On Substack, open Settings and make '
           'your subscriptions visible on your profile, then try again.');
     }
-    pubs.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return pubs;
+    // Only publications that post: people's profiles and dormant pubs have no
+    // newsletter posts in their archive.
+    final checked = <SubstackPub>[];
+    for (var i = 0; i < pubs.length; i += 6) {
+      checked.addAll((await Future.wait(pubs.skip(i).take(6).map(_withLastPost))).whereType<SubstackPub>());
+    }
+    if (checked.isEmpty) throw SourceException('None of the publications $handle follows has published posts yet');
+    checked.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return checked;
+  }
+
+  /// [pub] with the date of its latest post, or null when it has none. Kept
+  /// as it is when the archive can't be read (better than dropping it).
+  static Future<SubstackPub?> _withLastPost(SubstackPub pub) async {
+    try {
+      final posts = (await Net.getJson('https://${pub.host}/api/v1/archive?sort=new&offset=0&limit=12') as List)
+          .cast<Map>()
+          .where((p) => p['type'] == 'newsletter');
+      if (posts.isEmpty) return null;
+      // The newest post that has a date (the archive is sorted newest first).
+      return pub.withLastPost(posts.map((p) => DateTime.tryParse(p['post_date'] as String? ?? '')).nonNulls.firstOrNull);
+    } on SourceException catch (e) {
+      return e is RateLimitedException ? pub : null; // 404: no such publication any more.
+    } catch (_) {
+      return pub; // Offline or a bad reply: keep it, it is checked again on the next refresh.
+    }
   }
 
   static bool _isPaid(Map s) {

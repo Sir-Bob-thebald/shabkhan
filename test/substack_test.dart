@@ -28,6 +28,8 @@ class FakeSubstack {
   var subscriptions = [
     _sub(1, 'Zeta Letters', 'zeta', 'free_signup'),
     _sub(2, 'Alpha Fiction', 'alpha', 'subscribed_paid'),
+    // A reader's own profile: followed, but it never posts.
+    _sub(3, 'Quiet Reader', 'quiet', 'free_signup'),
   ];
 
   http.Client get client => MockClient((req) async {
@@ -43,10 +45,11 @@ class FakeSubstack {
               : http.Response('{"errors":[{"msg":"Please sign in"}]}', 401);
         }
         if (path == '/api/v1/archive') {
+          if (req.url.host == 'quiet.substack.com') return http.Response('[]', 200);
           return http.Response(
               jsonEncode([
                 {'id': 10, 'type': 'newsletter', 'audience': 'only_paid', 'wordcount': 1500, 'title': 'Paid'},
-                {'id': 11, 'type': 'newsletter', 'audience': 'everyone', 'wordcount': 1500, 'title': 'Free essay'},
+                {'id': 11, 'type': 'newsletter', 'audience': 'everyone', 'wordcount': 1500, 'title': 'Free essay', 'post_date': '2026-10-30T08:00:00.000Z'},
                 {'id': 12, 'type': 'podcast', 'audience': 'everyone', 'wordcount': 1500, 'title': 'Pod'},
                 {'id': 13, 'type': 'newsletter', 'audience': 'everyone', 'wordcount': 90, 'title': 'Night'},
               ]),
@@ -100,6 +103,18 @@ void main() {
     expect(lib.substackPubs.first.host, 'alpha.substack.com');
     expect(lib.sources.whereType<SubstackSource>(), hasLength(1));
     expect(lib.substackSource.types, ReadingType.values.toSet());
+  });
+
+  test('only publications that post are listed, each with its latest post and its page', () async {
+    final lib = await Library.load();
+    await lib.connectSubstack('reader');
+    expect(lib.substackPubs.map((p) => p.name), isNot(contains('Quiet Reader')));
+    final alpha = lib.substackPubs.first;
+    // The paid post (id 10) comes first in the archive and has no date; the latest dated one is used.
+    expect(alpha.lastPost, DateTime.parse('2026-10-30T08:00:00.000Z'));
+    expect(alpha.page.toString(), 'https://alpha.substack.com');
+    final reloaded = await Library.load();
+    expect(reloaded.substackPubs.first.lastPost, alpha.lastPost);
   });
 
   test('unknown users and hidden follow lists say what is wrong', () async {

@@ -585,7 +585,7 @@ class Library extends ChangeNotifier {
     final fresh = await substack.follows(handle);
     substackPubs = [
       for (final p in fresh)
-        if (old[p.id] case final o?) o.copyWith(paid: p.paid) else p,
+        if (old[p.id] case final o?) o.copyWith(paid: p.paid).withLastPost(p.lastPost) else p,
     ];
     await _saveSubstack();
   }
