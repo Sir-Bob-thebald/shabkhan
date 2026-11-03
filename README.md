@@ -53,6 +53,3 @@ tool/         helper scripts (icons, OAuth redirect page)
 
 To add a new source, implement `ReadingSource` in `lib/sources/` and register
 it in `lib/sources/registry.dart`.
-
-See [docs/DETAILS.md](docs/DETAILS.md) for how sources, languages, artwork,
-translation and account sign-in work in detail.
