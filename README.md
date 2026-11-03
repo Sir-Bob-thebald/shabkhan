@@ -28,7 +28,16 @@ Built with Flutter, Android first.
 - **Themes**: Dark, Midnight, Sepia and White.
 - **Optional nightly reminder** notification.
 
-## Getting started
+## Download
+
+**[Download the latest Android APK](https://github.com/Sir-Bob-thebald/shabkhan/releases/latest/download/shabkhan-nightly-reader-1.0.0-arm64.apk)**
+(Android, 64-bit ARM, about 22 MB). Older versions are on the
+[Releases](https://github.com/Sir-Bob-thebald/shabkhan/releases) page.
+
+To install it, open the file on your phone and allow installing from this
+source when Android asks.
+
+## Building from source
 
 Requires the [Flutter SDK](https://docs.flutter.dev/get-started/install).
 
