@@ -1,0 +1,3 @@
+tags:
+  live:
+    # Network tests against the real sources; skip with: flutter test -x live
