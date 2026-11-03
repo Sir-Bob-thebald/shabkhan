@@ -54,10 +54,11 @@ class NotionAccount {
   static const clientId = String.fromEnvironment('NOTION_CLIENT_ID');
   static const clientSecret = String.fromEnvironment('NOTION_CLIENT_SECRET');
 
-  /// Must match a redirect URI of the public integration. Never loaded: the
-  /// sign-in WebView catches the redirect and takes the code from it.
+  /// Must match the public integration's redirect URI byte for byte. Notion
+  /// sends the browser here after sign-in; Android hands the link to the app
+  /// (intent filter in AndroidManifest.xml).
   static const redirectUri =
-      String.fromEnvironment('NOTION_REDIRECT_URI', defaultValue: 'https://localhost/nightly-reader/notion');
+      String.fromEnvironment('NOTION_REDIRECT_URI', defaultValue: 'com.nightlyreader.shabkhan://oauth/notion');
 
   static bool get oauthAvailable => clientId.isNotEmpty && clientSecret.isNotEmpty;
 

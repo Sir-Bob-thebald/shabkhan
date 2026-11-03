@@ -30,6 +30,13 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- The Notion sign-in comes back here: com.nightlyreader.shabkhan://oauth/notion -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.nightlyreader.shabkhan" android:host="oauth" android:path="/notion"/>
+            </intent-filter>
             <!-- "Share → Nightly Reader": a link to add as a source. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND"/>

@@ -52,3 +52,6 @@ tool/atlas_scan.json
 shots/
 android/build/
 *.apk
+
+# Notion public integration credentials (flutter build ... --dart-define-from-file=notion_oauth.json)
+notion_oauth.json

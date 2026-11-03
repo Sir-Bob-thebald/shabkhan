@@ -173,6 +173,28 @@ void main() {
     expect(url.queryParameters, containsPair('state', 'xyz'));
   });
 
+  test('the browser sign-in comes back by the app link and must answer our own request', () async {
+    final lib = await Library.load();
+    final start = await lib.startNotionSignIn();
+    expect(start.queryParameters['redirect_uri'], 'com.nightlyreader.shabkhan://oauth/notion');
+    final state = start.queryParameters['state']!;
+
+    // A reply with another state (not started by this app) is refused.
+    final forged = Uri.parse('${NotionAccount.redirectUri}?code=x&state=nope');
+    expect(Library.isNotionCallback(forged), isTrue);
+    await expectLater(lib.finishNotionSignIn(forged), throwsA(isA<SourceException>()));
+    expect(lib.notion.signedIn, isFalse);
+
+    final again = await lib.startNotionSignIn();
+    final reply = Uri.parse('${NotionAccount.redirectUri}?code=the-code&state=${again.queryParameters['state']}');
+    expect(state, isNot(again.queryParameters['state']));
+    expect(await lib.finishNotionSignIn(reply), 4);
+    expect(lib.notion.signedIn, isTrue);
+    // The state is single-use.
+    await expectLater(lib.finishNotionSignIn(reply), throwsA(isA<SourceException>()));
+    expect(Library.isNotionCallback(Uri.parse('https://example.com/?code=1')), isFalse);
+  });
+
   test('a token that cannot read the database is discarded', () async {
     final lib = await Library.load();
     await expectLater(lib.connectNotion('ntn_bad'), throwsA(isA<SourceException>()));

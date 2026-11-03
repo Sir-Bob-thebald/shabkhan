@@ -643,6 +643,35 @@ class Library extends ChangeNotifier {
   /// Finishes "Connect with Notion": swaps the sign-in code for a token.
   Future<int> connectNotionWithCode(String code) async => connectNotion(await NotionAccount.exchangeCode(code));
 
+  /// Starts "Connect with Notion": the page to open in the browser. The
+  /// state is kept in storage, as Android may close the app meanwhile.
+  Future<Uri> startNotionSignIn() async {
+    final rng = Random.secure();
+    final state = List.generate(24, (_) => rng.nextInt(16).toRadixString(16)).join();
+    await _prefs.setString('notion:oauthState', state);
+    return NotionAccount.authorizeUrl(state);
+  }
+
+  /// Whether [link] is Notion's sign-in coming back to the app.
+  static bool isNotionCallback(Uri link) => link.toString().startsWith(NotionAccount.redirectUri);
+
+  /// Finishes the sign-in from the link Notion sent back: checks that it
+  /// answers our own request, then connects. Returns the nightly reads found.
+  Future<int> finishNotionSignIn(Uri link) async {
+    final expected = _prefs.getString('notion:oauthState');
+    await _prefs.remove('notion:oauthState');
+    final p = link.queryParameters;
+    if (expected == null || p['state'] != expected) {
+      throw SourceException('That sign-in reply wasn\'t for this app; try Connect with Notion again');
+    }
+    if (p['error'] != null) {
+      throw SourceException(p['error'] == 'access_denied' ? 'Notion access was declined' : 'Notion: ${p['error']}');
+    }
+    final code = p['code'];
+    if (code == null) throw SourceException('Notion sent no sign-in code');
+    return connectNotionWithCode(code);
+  }
+
   Future<void> useNotionDatabase(NotionDatabase db) async {
     await notion.useDatabase(db);
     await notion.shortSources(refresh: true);

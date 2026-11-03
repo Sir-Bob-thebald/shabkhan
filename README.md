@@ -174,14 +174,20 @@ out of the pool. You can turn this off in Sources.
 (through Notion's search API), so there's no database ID to type, and none is
 built into the app. There are two ways to connect:
 
-- **Connect with Notion** (OAuth): sign in on Notion's own page and pick the
-  pages to share. This needs a *public* integration (notion.so/profile/integrations
-  → New integration → Public) with the redirect URI
-  `https://localhost/nightly-reader/notion`. The app catches that redirect,
-  so it is never loaded. Build with
-  `--dart-define=NOTION_CLIENT_ID=… --dart-define=NOTION_CLIENT_SECRET=…`; the
-  button only appears in builds that have them. The secret ends up in the APK
-  but not in the source code, which is acceptable for a personal sideloaded app.
+- **Connect with Notion** (OAuth): you sign in on Notion's page in the phone's
+  browser (Google sign-in works there) and pick the pages to share. Notion then
+  sends the browser to `com.nightlyreader.shabkhan://oauth/notion?code=…&state=…`,
+  and Android hands that link to the app. The app checks the `state` it saved
+  when starting, then swaps the code for a token. This needs a *public*
+  integration (notion.so/profile/integrations → New integration → Public) whose
+  redirect URI is exactly `com.nightlyreader.shabkhan://oauth/notion`. Put its
+  credentials in `notion_oauth.json` (git-ignored):
+  ```json
+  {"NOTION_CLIENT_ID": "…", "NOTION_CLIENT_SECRET": "…"}
+  ```
+  and build with `--dart-define-from-file=notion_oauth.json`. The button only
+  appears in builds that have them. The secret ends up in the APK but not in
+  the source code, which is acceptable for a personal sideloaded app.
 - **Use an integration secret**: paste `NOTION_TOKEN` from `notion/.env`.
 
 The token is kept in secure storage and only sent to api.notion.com. The row

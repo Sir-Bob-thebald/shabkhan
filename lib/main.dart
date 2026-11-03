@@ -59,16 +59,33 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       _share.setMethodCallHandler((call) async {
         if (call.method == 'shared') _onShared(call.arguments as String?);
+        if (call.method == 'link') _onLink(call.arguments as String?);
       });
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           _onShared(await _share.invokeMethod<String>('takeShared'));
+          _onLink(await _share.invokeMethod<String>('takeLink'));
         } on MissingPluginException {
           // Not running inside the Android app (tests).
         } on PlatformException catch (e) {
           debugPrint('Could not read a shared link: $e');
         }
       });
+    }
+  }
+
+  /// Notion's sign-in coming back from the browser: finish connecting.
+  Future<void> _onLink(String? link) async {
+    final uri = link == null ? null : Uri.tryParse(link);
+    if (uri == null || !Library.isNotionCallback(uri) || !mounted) return;
+    setState(() => _tab = 3);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Connecting Notion…')));
+    try {
+      final n = await widget.library.finishNotionSignIn(uri);
+      messenger.showSnackBar(SnackBar(content: Text('Notion connected: $n nightly reads found')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
     }
   }
 

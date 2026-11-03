@@ -9,7 +9,9 @@ import '../sources/notion_atlas.dart';
 import '../sources/source.dart';
 import '../sources/substack.dart';
 import 'catalog_screen.dart';
-import 'notion_login_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../services/net.dart';
 import 'substack_login_screen.dart';
 
 /// Sources, one tab per reading type plus the connected accounts. Each type
@@ -514,10 +516,14 @@ class _NotionSectionState extends State<_NotionSection> with _Busy {
             Wrap(
               spacing: 8,
               children: [
-                if (NotionAccount.oauthAvailable && NotionLoginScreen.supported)
+                if (NotionAccount.oauthAvailable && Theme.of(context).platform == TargetPlatform.android)
                   FilledButton.icon(
-                    onPressed: () async => _connected(await Navigator.push<int>(
-                        context, MaterialPageRoute(builder: (_) => NotionLoginScreen(library: lib)))),
+                    // Signs in in the phone's browser (Google sign-in works there);
+                    // Notion sends the browser back to the app, see HomeShell._onLink.
+                    onPressed: () => run(() async {
+                      final ok = await launchUrl(await lib.startNotionSignIn(), mode: LaunchMode.externalApplication);
+                      if (!ok) throw SourceException('Could not open the browser');
+                    }),
                     icon: const Icon(Icons.login),
                     label: const Text('Connect with Notion'),
                   ),
