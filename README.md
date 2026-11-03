@@ -93,11 +93,27 @@ Each reading gets a public-domain painting or other work, found by
 3. **Era**: from the source or author (Hafez → 1350–1550, Wikisource
    classics → 1780–1920).
 
-It asks **The Met**'s open-access API first (filtering by `geoLocation` and
-`dateBegin`/`dateEnd`). Each search keeps the subject; the era, then the
-place, are dropped when nothing matches. **Wikimedia Commons** is the
-fallback, using public-domain files only. The Art Institute of Chicago's API
-is behind a Cloudflare check from Iran, so it isn't used.
+It asks four open collections, in a random order for each reading so the
+pictures come from many museums:
+
+- **The Met**: filters by `geoLocation` and `dateBegin`/`dateEnd`.
+- **The Cleveland Museum of Art**: CC0; dates via `created_after`/`created_before`.
+- **SMK**, the National Gallery of Denmark: public-domain works only; it has
+  no date filter here, so it sits out the steps that need an era.
+- **Europeana**, which gathers thousands of European museums: only items
+  marked public domain or CC0; dates via `qf=YEAR:[…]`. It uses the public
+  `api2demo` key, or your own with `--dart-define=EUROPEANA_KEY=…`.
+
+Keyword collections get the place as a word ("Persian", "German"). Every
+collection is asked at each step, and a step is only relaxed (era first, then
+place) when none of them has a match. **Wikimedia Commons** is the fallback,
+using public-domain files only.
+
+Not used:
+- The Art Institute of Chicago and the Library of Congress are behind a
+  Cloudflare check from Iran.
+- Harvard and the Smithsonian need personal keys.
+- The V&A's images aren't public domain.
 
 Pictures appear as a faint backdrop on the Tonight card and at the top of
 the reader, with title, artist, date, origin and credit. They are left out

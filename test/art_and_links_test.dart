@@ -82,6 +82,54 @@ void main() {
       expect(searches[1].containsKey('dateBegin'), isFalse);
     });
 
+    test('pictures come from several collections, not always the same one', () async {
+      Net.client = MockClient((req) async => switch (req.url.host) {
+            'collectionapi.metmuseum.org' => req.url.path.contains('/objects/')
+                ? _json({'isPublicDomain': true, 'primaryImageSmall': 'https://m/1.jpg', 'title': 'Met work'})
+                : _json({'total': 1, 'objectIDs': [1]}),
+            'openaccess-api.clevelandart.org' => _json({
+                'data': [
+                  {'title': 'Cleveland work', 'images': {'web': {'url': 'https://c/1.jpg'}}}
+                ]
+              }),
+            'api.smk.dk' => _json({
+                'items': [
+                  {'image_thumbnail': 'https://s/1.jpg', 'public_domain': true, 'titles': [{'title': 'SMK work'}]}
+                ]
+              }),
+            'api.europeana.eu' => _json({
+                'items': [
+                  {
+                    'title': ['Europeana work'],
+                    'edmPreview': ['https://e/thumb?uri=x'],
+                    'rights': ['http://creativecommons.org/publicdomain/mark/1.0/'],
+                  }
+                ]
+              }),
+            _ => http.Response('no', 404),
+          });
+      final credits = <String>{};
+      for (var seed = 0; seed < 40; seed++) {
+        credits.add((await ArtFinder.find(_r('The moon at night.'), Random(seed)))!.credit.split(' ').first);
+      }
+      expect(credits, containsAll(['The', 'Cleveland', 'SMK,', 'Europeana']));
+    });
+
+    test('Europeana items that are not public domain are skipped', () async {
+      Net.client = MockClient((req) async => req.url.host == 'api.europeana.eu'
+          ? _json({
+              'items': [
+                {
+                  'title': ['Licensed'],
+                  'edmPreview': ['https://e/t?uri=x'],
+                  'rights': ['http://creativecommons.org/licenses/by-sa/4.0/'],
+                }
+              ]
+            })
+          : http.Response('no', 404));
+      expect(await ArtFinder.find(_r('The moon.'), Random(1)), isNull);
+    });
+
     test('offline, no picture is found and nothing breaks', () async {
       Net.client = MockClient((req) async => throw http.ClientException('offline'));
       expect(await ArtFinder.find(_r('The moon.'), Random(1)), isNull);

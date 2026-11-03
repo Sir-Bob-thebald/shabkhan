@@ -76,9 +76,12 @@ const _eras = <(List<String>, int, int)>[
   (['poetrydb'], 1600, 1900),
 ];
 
-/// Finds a public-domain work of art to go with a reading: The Met's open
-/// collection first, then Wikimedia Commons. Every search keeps the subject;
-/// place, then era, are dropped when nothing matches.
+typedef _Collection = Future<Artwork?> Function(Random rng, {required String q, String? place, ({int from, int to})? era});
+
+/// Finds a public-domain work of art to go with a reading, from four open
+/// collections (The Met, Cleveland, SMK, Europeana) in a random order, then
+/// Wikimedia Commons. Every search keeps the subject; place, then era, are
+/// dropped only when no collection has a match.
 class ArtFinder {
   static const _met = 'https://collectionapi.metmuseum.org/public/collection';
 
@@ -120,16 +123,149 @@ class ArtFinder {
       (null, h.era),
       (null, null),
     ];
+    // Every collection is asked at each step, in a random order per reading,
+    // so the pictures come from many museums; a step is only relaxed when none
+    // of them has a match.
+    final collections = [..._collections]..shuffle(rng);
     for (final (place, era) in tries) {
       if (place == null && era == null && h.place != null) {
         // Last resort before dropping everything: the place alone, any subject.
-        final art = await _fromMet(rng, q: 'painting', place: h.place, era: h.era);
+        for (final c in collections) {
+          final art = await c(rng, q: 'painting', place: h.place, era: h.era);
+          if (art != null) return art;
+        }
+      }
+      for (final c in collections) {
+        final art = await c(rng, q: h.subject, place: place, era: era);
         if (art != null) return art;
       }
-      final art = await _fromMet(rng, q: h.subject, place: place, era: era);
-      if (art != null) return art;
     }
     return _fromCommons(rng, '${h.subject} painting');
+  }
+
+  /// Open-access collections with a search API, all public domain or CC0.
+  static const _collections = <_Collection>[_fromMet, _fromCleveland, _fromSmk, _fromEuropeana];
+
+  /// How collections that search by keyword name a place.
+  static const _placeWords = {
+    'Iran': 'Persian', 'Egypt': 'Egyptian', 'India': 'Indian', 'Turkey': 'Ottoman', 'England': 'British', //
+    'Germany': 'German', 'France': 'French', 'Russia': 'Russian', 'Ukraine': 'Ukrainian', 'Spain': 'Spanish',
+    'Italy': 'Italian', 'Portugal': 'Portuguese', 'Netherlands': 'Dutch', 'Sweden': 'Swedish', 'Poland': 'Polish',
+    'Greece': 'Greek', 'Israel': 'Hebrew', 'Japan': 'Japanese', 'China': 'Chinese', 'Korea': 'Korean',
+    'Armenia': 'Armenian', 'Georgia': 'Georgian',
+  };
+
+  static String _query(String q, String? place) => place == null ? q : '$q ${_placeWords[place] ?? place}';
+
+  /// The Cleveland Museum of Art: everything with an image here is CC0.
+  static Future<Artwork?> _fromCleveland(Random rng, {required String q, String? place, ({int from, int to})? era}) async {
+    final Map res;
+    try {
+      res = await Net.getJson(Uri.https('openaccess-api.clevelandart.org', '/api/artworks/', {
+        'q': _query(q, place),
+        'has_image': '1',
+        'cc0': '1',
+        'limit': '40',
+        if (era != null) 'created_after': '${era.from}',
+        if (era != null) 'created_before': '${era.to}',
+      }).toString()) as Map;
+    } on Exception {
+      return null;
+    }
+    final items = [...(res['data'] as List? ?? const [])]..shuffle(rng);
+    for (final a in items.cast<Map>()) {
+      final images = (a['images'] as Map?) ?? const {};
+      final web = (images['web'] as Map?)?['url'] as String?;
+      if (web == null) continue;
+      final creators = (a['creators'] as List? ?? const []).cast<Map>();
+      return Artwork(
+        imageUrl: web,
+        fullUrl: (images['print'] as Map?)?['url'] as String? ?? web,
+        title: a['title'] as String? ?? 'Untitled',
+        artist: creators.isEmpty ? null : creators.first['description'] as String?,
+        date: a['creation_date'] as String?,
+        origin: (a['culture'] as List?)?.cast<String>().firstOrNull,
+        credit: 'Cleveland Museum of Art · CC0',
+        pageUrl: a['url'] as String?,
+      );
+    }
+    return null;
+  }
+
+  /// SMK, the National Gallery of Denmark (public-domain works only). It can't
+  /// filter by date here, so it sits out the steps that need an era.
+  static Future<Artwork?> _fromSmk(Random rng, {required String q, String? place, ({int from, int to})? era}) async {
+    if (era != null) return null;
+    final Map res;
+    try {
+      res = await Net.getJson(Uri.https('api.smk.dk', '/api/v1/art/search/', {
+        'keys': _query(q, place),
+        'filters': '[has_image:true],[public_domain:true]',
+        'offset': '0',
+        'rows': '40',
+      }).toString()) as Map;
+    } on Exception {
+      return null;
+    }
+    final items = [...(res['items'] as List? ?? const [])]..shuffle(rng);
+    for (final a in items.cast<Map>()) {
+      final thumb = a['image_thumbnail'] as String?;
+      if (thumb == null || a['public_domain'] != true) continue;
+      final titles = (a['titles'] as List? ?? const []).cast<Map>();
+      final title = (titles.where((t) => t['language'] == 'engelsk').firstOrNull ?? titles.firstOrNull)?['title'];
+      final made = (a['production'] as List? ?? const []).cast<Map>().firstOrNull;
+      final when = (a['production_date'] as List? ?? const []).cast<Map>().firstOrNull;
+      return Artwork(
+        imageUrl: thumb,
+        fullUrl: a['image_native'] as String? ?? thumb,
+        title: title as String? ?? 'Untitled',
+        artist: made?['creator'] as String?,
+        date: when?['period'] as String?,
+        credit: 'SMK, National Gallery of Denmark · Public domain',
+        pageUrl: a['frontend_url'] as String?,
+      );
+    }
+    return null;
+  }
+
+  /// Europeana, which gathers thousands of European museums. Only items marked
+  /// public domain or CC0 are used. `api2demo` is Europeana's public demo key.
+  static Future<Artwork?> _fromEuropeana(Random rng, {required String q, String? place, ({int from, int to})? era}) async {
+    final Map res;
+    try {
+      final params = <String, dynamic>{
+        'wskey': const String.fromEnvironment('EUROPEANA_KEY', defaultValue: 'api2demo'),
+        'query': _query(q, place),
+        'reusability': 'open',
+        'media': 'true',
+        'type': 'IMAGE',
+        'rows': '40',
+        if (era != null) 'qf': 'YEAR:[${era.from} TO ${era.to}]',
+      };
+      res = await Net.getJson(Uri.https('api.europeana.eu', '/record/v2/search.json', params).toString()) as Map;
+    } on Exception {
+      return null;
+    }
+    final items = [...(res['items'] as List? ?? const [])]..shuffle(rng);
+    String? first(Map a, String k) => (a[k] as List?)?.cast<Object?>().whereType<String>().firstOrNull;
+    for (final a in items.cast<Map>()) {
+      final rights = first(a, 'rights') ?? '';
+      if (!rights.contains('publicdomain') && !rights.contains('/zero/')) continue;
+      final preview = first(a, 'edmPreview');
+      if (preview == null) continue;
+      return Artwork(
+        // The preview service scales the image; the original can be huge.
+        imageUrl: '$preview&size=w400',
+        fullUrl: first(a, 'edmIsShownBy') ?? preview,
+        title: first(a, 'title') ?? 'Untitled',
+        artist: first(a, 'dcCreator'),
+        date: first(a, 'year'),
+        origin: first(a, 'country'),
+        credit: '${first(a, 'dataProvider') ?? 'Europeana'} via Europeana · Public domain',
+        pageUrl: (a['guid'] as String?)?.split('?').first,
+      );
+    }
+    return null;
   }
 
   static Future<Artwork?> _fromMet(Random rng, {required String q, String? place, ({int from, int to})? era}) async {
