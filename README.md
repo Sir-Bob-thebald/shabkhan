@@ -175,17 +175,23 @@ out of the pool. You can turn this off in Sources.
 built into the app. There are two ways to connect:
 
 - **Connect with Notion** (OAuth): you sign in on Notion's page in the phone's
-  browser (Google sign-in works there) and pick the pages to share. Notion then
-  sends the browser to `shabkhan://oauth/notion?code=…&state=…`,
-  and Android hands that link to the app. The app checks the `state` it saved
-  when starting, then swaps the code for a token. This needs a *public*
-  integration (notion.so/profile/integrations → New integration → Public) whose
-  redirect URI is exactly `shabkhan://oauth/notion`. Put its
-  credentials in `notion_oauth.json` (git-ignored):
+  browser (Google sign-in works there) and pick the pages to share. Notion only
+  accepts `https://` redirect URIs, so it sends the browser to a static page,
+  `https://sir-bob-thebald.github.io/shabkhan-oauth/notion/` (source in
+  `tool/oauth_page/`). That page passes `code` and `state` on to
+  `shabkhan://oauth/notion`, and Android hands the link to the app. The app
+  checks the `state` it saved when starting, then swaps the code for a token.
+  The page sees only the code, which is useless without the client secret.
+  This needs:
+  1. The page published: a **public** repo `shabkhan-oauth` holding
+     `tool/oauth_page/` at its root, with GitHub Pages on (branch `main`, folder `/`).
+  2. A *public* Notion integration (notion.so/profile/integrations → New
+     integration → Public) whose redirect URI is exactly that page's address.
+  3. Its credentials in `notion_oauth.json` (git-ignored):
   ```json
   {"NOTION_CLIENT_ID": "…", "NOTION_CLIENT_SECRET": "…"}
   ```
-  and build with `--dart-define-from-file=notion_oauth.json`. The button only
+     Then build with `--dart-define-from-file=notion_oauth.json`. The button only
   appears in builds that have them. The secret ends up in the APK but not in
   the source code, which is acceptable for a personal sideloaded app.
 - **Use an integration secret**: paste `NOTION_TOKEN` from `notion/.env`.

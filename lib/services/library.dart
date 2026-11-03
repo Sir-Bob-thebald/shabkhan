@@ -653,7 +653,7 @@ class Library extends ChangeNotifier {
   }
 
   /// Whether [link] is Notion's sign-in coming back to the app.
-  static bool isNotionCallback(Uri link) => link.toString().startsWith(NotionAccount.redirectUri);
+  static bool isNotionCallback(Uri link) => link.toString().startsWith(NotionAccount.appCallback);
 
   /// Finishes the sign-in from the link Notion sent back: checks that it
   /// answers our own request, then connects. Returns the nightly reads found.

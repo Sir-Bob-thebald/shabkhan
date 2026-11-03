@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>شبخوان · Nightly Reader</title>
+<style>
+  :root { color-scheme: dark; --lamp: #F4CD8C; --text: #EDE5D8; --muted: #9A8F7E; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #000; color: var(--text);
+         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; text-align: center; padding: 0 16px; }
+  main { max-width: 26rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  .en { color: var(--lamp); letter-spacing: .08em; font-size: .85rem; margin: 0 0 1.5rem; }
+  a.button { display: inline-block; margin-top: 1rem; padding: .8rem 1.6rem; border-radius: 999px;
+             background: var(--lamp); color: #1E1407; text-decoration: none; font-weight: 600; }
+  p { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>شبخوان</h1>
+  <p class="en">NIGHTLY READER</p>
+  <p id="msg">در حال بازگشت به برنامه…<br><span dir="ltr">Returning to the app…</span></p>
+  <a class="button" id="open" href="#">بازگشت به شبخوان · Open the app</a>
+</main>
+<script>
+  // Notion sends the browser here after sign-in (?code=…&state=…). Hand the
+  // same query to the app; the code is useless without the app's secret.
+  var q = location.search;
+  var app = 'shabkhan://oauth/notion' + q;
+  // Chrome on Android opens apps more reliably through an intent:// link.
+  var intent = 'intent://oauth/notion' + q +
+      '#Intent;scheme=shabkhan;package=com.nightlyreader.nightly_reader;end';
+  var link = /Android/i.test(navigator.userAgent) ? intent : app;
+  document.getElementById('open').href = link;
+  if (/[?&](code|error)=/.test(q)) {
+    location.replace(link);
+  } else {
+    document.getElementById('msg').innerHTML = 'این صفحه فقط برای ورود به Notion از برنامه است.' +
+        '<br><span dir="ltr">This page only finishes the Notion sign-in from the app.</span>';
+    document.getElementById('open').style.display = 'none';
+  }
+</script>
+</body>
+</html>

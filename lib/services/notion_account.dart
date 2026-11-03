@@ -54,11 +54,15 @@ class NotionAccount {
   static const clientId = String.fromEnvironment('NOTION_CLIENT_ID');
   static const clientSecret = String.fromEnvironment('NOTION_CLIENT_SECRET');
 
-  /// Must match the public integration's redirect URI byte for byte. Notion
-  /// sends the browser here after sign-in; Android hands the link to the app
-  /// (intent filter in AndroidManifest.xml).
-  static const redirectUri =
-      String.fromEnvironment('NOTION_REDIRECT_URI', defaultValue: 'shabkhan://oauth/notion');
+  /// The public integration's redirect URI, byte for byte. Notion only takes
+  /// https, so it's a static page (GitHub Pages, repo shabkhan-oauth) that
+  /// passes `code` and `state` on to [appCallback].
+  static const redirectUri = String.fromEnvironment('NOTION_REDIRECT_URI',
+      defaultValue: 'https://sir-bob-thebald.github.io/shabkhan-oauth/notion/');
+
+  /// Where that page sends the browser; Android hands it to the app (intent
+  /// filter in AndroidManifest.xml).
+  static const appCallback = 'shabkhan://oauth/notion';
 
   static bool get oauthAvailable => clientId.isNotEmpty && clientSecret.isNotEmpty;
 
