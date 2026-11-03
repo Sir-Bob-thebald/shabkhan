@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/languages.dart';
 import '../models/reading.dart';
@@ -11,7 +12,6 @@ import '../sources/substack.dart';
 import 'catalog_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/net.dart';
 import 'substack_login_screen.dart';
 
 /// Sources, one tab per reading type plus the connected accounts. Each type
@@ -352,7 +352,8 @@ mixin _Busy<T extends StatefulWidget> on State<T> {
     setState(() => busy = true);
     try {
       await action();
-    } on Exception catch (e) {
+    } catch (e) {
+      // Everything, not only Exceptions: a silent failure looks like a dead button.
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       if (mounted) setState(() => busy = false);
@@ -493,6 +494,46 @@ class _NotionSection extends StatefulWidget {
 }
 
 class _NotionSectionState extends State<_NotionSection> with _Busy {
+  /// Opens Notion's sign-in in the browser: the phone's own browser first,
+  /// then an in-app browser tab, and as a last resort the link to copy.
+  Future<void> _signInWithNotion() async {
+    final url = await widget.library.startNotionSignIn();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Opening Notion in your browser… Approve, then you come back here.')));
+    for (final mode in [LaunchMode.externalApplication, LaunchMode.inAppBrowserView, LaunchMode.platformDefault]) {
+      try {
+        if (await launchUrl(url, mode: mode)) return;
+      } catch (e) {
+        debugPrint('Opening Notion sign-in ($mode) failed: $e');
+      }
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Open this link in a browser'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('The browser didn\'t open by itself. Copy the link, paste it into your browser, '
+                'approve, and you\'ll come back to the app.'),
+            const SizedBox(height: 12),
+            SelectableText('$url', style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: '$url')),
+            child: const Text('Copy link'),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _connected(int? n) async {
     if (n != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connected: $n nightly reads found')));
@@ -520,12 +561,15 @@ class _NotionSectionState extends State<_NotionSection> with _Busy {
                   FilledButton.icon(
                     // Signs in in the phone's browser (Google sign-in works there);
                     // Notion sends the browser back to the app, see HomeShell._onLink.
-                    onPressed: () => run(() async {
-                      final ok = await launchUrl(await lib.startNotionSignIn(), mode: LaunchMode.externalApplication);
-                      if (!ok) throw SourceException('Could not open the browser');
-                    }),
+                    onPressed: busy ? null : () => run(_signInWithNotion),
                     icon: const Icon(Icons.login),
                     label: const Text('Connect with Notion'),
+                  ),
+                if (!NotionAccount.oauthAvailable)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('This build has no "Connect with Notion" (it was built without the '
+                        'integration\'s credentials).', style: hint),
                   ),
                 TextButton(
                   onPressed: () async => _connected(
