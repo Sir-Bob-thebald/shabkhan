@@ -176,7 +176,7 @@ void main() {
   test('the browser sign-in comes back by the app link and must answer our own request', () async {
     final lib = await Library.load();
     final start = await lib.startNotionSignIn();
-    expect(start.queryParameters['redirect_uri'], 'com.nightlyreader.shabkhan://oauth/notion');
+    expect(start.queryParameters['redirect_uri'], 'shabkhan://oauth/notion');
     final state = start.queryParameters['state']!;
 
     // A reply with another state (not started by this app) is refused.

@@ -7,7 +7,7 @@ import io.flutter.plugin.common.MethodChannel
 
 /// Hands two kinds of incoming intents to Flutter:
 /// - links shared from other apps ("Share → Nightly Reader"), to add as a source;
-/// - the Notion sign-in coming back (com.nightlyreader.shabkhan://oauth/notion?code=…).
+/// - the Notion sign-in coming back (shabkhan://oauth/notion?code=…).
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var pendingShare: String? = null

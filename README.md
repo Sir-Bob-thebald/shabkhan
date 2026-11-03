@@ -176,11 +176,11 @@ built into the app. There are two ways to connect:
 
 - **Connect with Notion** (OAuth): you sign in on Notion's page in the phone's
   browser (Google sign-in works there) and pick the pages to share. Notion then
-  sends the browser to `com.nightlyreader.shabkhan://oauth/notion?code=…&state=…`,
+  sends the browser to `shabkhan://oauth/notion?code=…&state=…`,
   and Android hands that link to the app. The app checks the `state` it saved
   when starting, then swaps the code for a token. This needs a *public*
   integration (notion.so/profile/integrations → New integration → Public) whose
-  redirect URI is exactly `com.nightlyreader.shabkhan://oauth/notion`. Put its
+  redirect URI is exactly `shabkhan://oauth/notion`. Put its
   credentials in `notion_oauth.json` (git-ignored):
   ```json
   {"NOTION_CLIENT_ID": "…", "NOTION_CLIENT_SECRET": "…"}

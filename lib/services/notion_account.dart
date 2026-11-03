@@ -58,7 +58,7 @@ class NotionAccount {
   /// sends the browser here after sign-in; Android hands the link to the app
   /// (intent filter in AndroidManifest.xml).
   static const redirectUri =
-      String.fromEnvironment('NOTION_REDIRECT_URI', defaultValue: 'com.nightlyreader.shabkhan://oauth/notion');
+      String.fromEnvironment('NOTION_REDIRECT_URI', defaultValue: 'shabkhan://oauth/notion');
 
   static bool get oauthAvailable => clientId.isNotEmpty && clientSecret.isNotEmpty;
 
