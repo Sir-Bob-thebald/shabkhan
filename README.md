@@ -30,7 +30,7 @@ Built with Flutter, Android first.
 
 ## Download
 
-**[Download the latest Android APK](https://github.com/Sir-Bob-thebald/shabkhan/releases/latest/download/shabkhan-nightly-reader-1.0.0-arm64.apk)**
+**[Download the latest Android APK](https://github.com/Sir-Bob-thebald/shabkhan/releases/latest/download/shabkhan-nightly-reader-arm64.apk)**
 (Android, 64-bit ARM, about 22 MB). Older versions are on the
 [Releases](https://github.com/Sir-Bob-thebald/shabkhan/releases) page.
 

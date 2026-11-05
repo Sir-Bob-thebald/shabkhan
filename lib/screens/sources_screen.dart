@@ -586,17 +586,22 @@ class _NotionSectionState extends State<_NotionSection> with _Busy {
                     child: const Text('Sign in in the browser instead'),
                   ),
                 ],
-                if (!NotionAccount.oauthAvailable)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text('This build has no "Connect with Notion" (it was built without the '
-                        'integration\'s credentials).', style: hint),
+                // Without a built-in integration, everyone connects their own.
+                if (NotionAccount.oauthAvailable)
+                  TextButton(
+                    onPressed: () async => _connected(
+                        await showDialog<int>(context: context, builder: (_) => _NotionSecretDialog(library: lib))),
+                    child: const Text('Use an integration secret'),
+                  )
+                else
+                  FilledButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () async => _connected(
+                            await showDialog<int>(context: context, builder: (_) => _NotionSecretDialog(library: lib))),
+                    icon: const Icon(Icons.key),
+                    label: const Text('Connect Notion'),
                   ),
-                TextButton(
-                  onPressed: () async => _connected(
-                      await showDialog<int>(context: context, builder: (_) => _NotionSecretDialog(library: lib))),
-                  child: const Text('Use an integration secret'),
-                ),
               ],
             ),
           ],
@@ -700,7 +705,10 @@ class _NotionSecretDialogState extends State<_NotionSecretDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('The atlas\'s secret (NOTION_TOKEN in notion/.env, or notion.so/my-integrations). '
+            Text('1. On notion.so/my-integrations, make a new internal integration and copy its secret.\n'
+                '2. In Notion, open your reading database (it needs a "${NotionAccount.nightlyProperty}" '
+                'checkbox), then ••• › Connections › add the integration.\n'
+                '3. Paste the secret here.\n\n'
                 'It stays on this device and is only sent to api.notion.com.', style: hint),
             const SizedBox(height: 8),
             TextField(

@@ -120,6 +120,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, '@username or profile link'), findsOneWidget);
     expect(find.textContaining('no password is needed'), findsOneWidget);
-    expect(find.text('Use an integration secret'), findsOneWidget);
+    // Built without a public integration: everyone connects their own key.
+    expect(find.text('Connect Notion'), findsOneWidget);
+    expect(find.text('Connect with Notion'), findsNothing);
   });
 }
