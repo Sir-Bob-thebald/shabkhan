@@ -85,34 +85,53 @@ void main() {
     test('pictures come from several collections, not always the same one', () async {
       Net.client = MockClient((req) async => switch (req.url.host) {
             'collectionapi.metmuseum.org' => req.url.path.contains('/objects/')
-                ? _json({'isPublicDomain': true, 'primaryImageSmall': 'https://m/1.jpg', 'title': 'Met work'})
+                ? _json({'isPublicDomain': true, 'primaryImageSmall': 'https://m/1.jpg', 'title': 'Met moon', 'classification': 'Paintings'})
                 : _json({'total': 1, 'objectIDs': [1]}),
             'openaccess-api.clevelandart.org' => _json({
                 'data': [
-                  {'title': 'Cleveland work', 'images': {'web': {'url': 'https://c/1.jpg'}}}
+                  {'title': 'Cleveland moon', 'type': 'Print', 'images': {'web': {'url': 'https://c/1.jpg'}}}
                 ]
               }),
             'api.smk.dk' => _json({
                 'items': [
-                  {'image_thumbnail': 'https://s/1.jpg', 'public_domain': true, 'titles': [{'title': 'SMK work'}]}
+                  {'image_thumbnail': 'https://s/1.jpg', 'public_domain': true, 'titles': [{'title': 'Månelys'}], 'object_names': [{'name': 'Maleri'}]}
                 ]
               }),
             'api.europeana.eu' => _json({
                 'items': [
                   {
-                    'title': ['Europeana work'],
+                    'title': ['Europeana moon'],
                     'edmPreview': ['https://e/thumb?uri=x'],
                     'rights': ['http://creativecommons.org/publicdomain/mark/1.0/'],
+                  }
+                ]
+              }),
+            'search.artsmia.org' => _json({
+                'hits': {
+                  'hits': [
+                    {
+                      '_source': {'id': 5, 'title': 'Moon over water', 'classification': 'Paintings', 'rights_type': 'Public Domain'}
+                    }
+                  ]
+                }
+              }),
+            'api.openverse.org' => _json({
+                'results': [
+                  {
+                    'title': 'Goose and <em>moon</em>',
+                    'license': 'cc0',
+                    'thumbnail': 'https://o/t/',
+                    'tags': [{'name': 'Moon'}, {'name': 'Paintings'}, {'name': 'England'}],
                   }
                 ]
               }),
             _ => http.Response('no', 404),
           });
       final credits = <String>{};
-      for (var seed = 0; seed < 40; seed++) {
+      for (var seed = 0; seed < 60; seed++) {
         credits.add((await ArtFinder.find(_r('The moon at night.'), Random(seed)))!.credit.split(' ').first);
       }
-      expect(credits, containsAll(['The', 'Cleveland', 'SMK,', 'Europeana']));
+      expect(credits, containsAll(['The', 'Cleveland', 'SMK,', 'Europeana', 'Minneapolis', 'Freer', 'Smithsonian']));
     });
 
     test('Europeana items that are not public domain are skipped', () async {
@@ -128,6 +147,66 @@ void main() {
             })
           : http.Response('no', 404));
       expect(await ArtFinder.find(_r('The moon.'), Random(1)), isNull);
+    });
+
+    test('works that name the subject pass, including textiles, sculpture, photos, maps and text pages; pots, coins and strips do not', () async {
+      Map item(String title, String type, {int w = 900, int h = 700}) => {
+            'title': title,
+            'type': type,
+            'images': {
+              'web': {'url': 'https://c/$title.jpg', 'width': '$w', 'height': '$h'}
+            },
+          };
+      Net.client = MockClient((req) async => req.url.host == 'openaccess-api.clevelandart.org'
+          ? _json({
+              'data': [
+                item('Moon flask', 'Ceramic'),
+                item('Coin with crescent moon', 'Coins'),
+                item('Moon jar', 'Painting'), // refused by its title whatever the type says
+                item('Moon gate', 'Furniture'),
+                item('Moon over the pines', 'Painting', w: 216, h: 900), // a hanging scroll: too tall for a card
+                item('Portrait of Sarah Moonsworth', 'Painting'), // the word is only part of a name
+                item('A garden', 'Painting'), // a good picture of the wrong subject
+                item('Moon and Waves', 'Painting'),
+                item('The moon rising', 'Photograph'),
+                item('Folio from a Qur\'an, moon verse', 'Manuscript'),
+                item('Calligraphy of the moon', 'Calligraphy'),
+                item('Moon goddess', 'Sculpture'),
+                item('Tapestry with the moon', 'Textile'),
+                item('Map of the moon', 'Map'),
+                item('Fragment of a moon fresco', 'Fragment'),
+              ]
+            })
+          : http.Response('no', 404));
+      final chosen = <String>{};
+      for (var seed = 0; seed < 80; seed++) {
+        chosen.add((await ArtFinder.find(_r('The moon.'), Random(seed)))!.title);
+      }
+      expect(chosen, {
+        'Moon and Waves', 'The moon rising', 'Folio from a Qur\'an, moon verse', 'Calligraphy of the moon', //
+        'Moon goddess', 'Tapestry with the moon', 'Map of the moon', 'Fragment of a moon fresco',
+      });
+    });
+
+    test('Openverse museums are checked for place and era by their tags', () async {
+      Map item(String title, List<String> tags) => {
+            'title': title,
+            'license': 'cc0',
+            'thumbnail': 'https://o/$title/',
+            'tags': [for (final t in tags) {'name': t}],
+          };
+      Net.client = MockClient((req) async => req.url.host == 'api.openverse.org'
+          ? _json({
+              'results': [
+                item('Night, Chinese', ['Night', 'Paintings', 'China', '1400s']),
+                item('Night, Persian, too late', ['Night', 'Paintings', 'Iran', '1800s']),
+                item('Night, Persian', ['Night', 'Manuscripts', 'Iran', '1400s']),
+              ]
+            })
+          : http.Response('no', 404));
+      final art = await ArtFinder.find(_r('شب و ماه و شب', lang: 'fa', sourceId: 'ganjoor-hafez'), Random(1));
+      expect(art!.title, 'Night, Persian');
+      expect(art.imageUrl, 'https://o/Night, Persian/');
     });
 
     test('offline, no picture is found and nothing breaks', () async {
@@ -156,6 +235,7 @@ void main() {
                     'extmetadata': {
                       'LicenseShortName': {'value': 'Public domain'},
                       'ObjectName': {'value': 'Moonrise'},
+                      'Categories': {'value': 'Paintings by Caspar David Friedrich|Moon in art'},
                       'Artist': {'value': '<a href="x">Caspar David Friedrich</a>'},
                     }
                   }

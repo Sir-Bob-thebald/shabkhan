@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:gal/gal.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/artwork.dart';
@@ -22,8 +23,13 @@ class ArtSaver {
 
   /// Returns where it went, for a message to the user.
   static Future<String> save(Artwork a) async {
-    final res = await Net.client.get(Uri.parse(a.fullUrl ?? a.imageUrl)).timeout(const Duration(seconds: 90));
-    if (res.statusCode != 200) throw SourceException('Could not download the image (HTTP ${res.statusCode})');
+    Future<http.Response> get(String url) => Net.client.get(Uri.parse(url)).timeout(const Duration(seconds: 90));
+    bool isImage(http.Response r) => r.statusCode == 200 && (r.headers['content-type'] ?? 'image/').startsWith('image/');
+    var res = await get(a.fullUrl ?? a.imageUrl);
+    // Some full-size servers refuse this network, or answer with an HTML
+    // error page; the screen-sized copy is better than nothing.
+    if (!isImage(res) && a.fullUrl != null && a.fullUrl != a.imageUrl) res = await get(a.imageUrl);
+    if (!isImage(res)) throw SourceException('Could not download the image (HTTP ${res.statusCode})');
     final bytes = res.bodyBytes;
     final name = fileName(a);
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {

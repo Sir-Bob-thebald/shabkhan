@@ -69,6 +69,16 @@ void main() {
     }
   }, timeout: const Timeout(Duration(minutes: 4)));
 
+  test('most art collections have a picture of the moon that passes the checks', () async {
+    final arts = await ArtFinder.eachCollection('moon', rng);
+    for (final a in arts) {
+      // ignore: avoid_print
+      print('[art] ${a == null ? '-' : '${a.credit} · ${a.title}'}');
+    }
+    // Openverse limits anonymous clients, so one or two may be busy.
+    expect(arts.whereType<Object>().length, greaterThanOrEqualTo(arts.length - 2));
+  }, timeout: const Timeout(Duration(minutes: 4)));
+
   test('links are turned into sources: a homepage finds its feed', () async {
     final found = await FeedSource.discover('https://www.themarginalian.org/');
     // ignore: avoid_print
